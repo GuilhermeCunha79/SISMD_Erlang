@@ -35,7 +35,7 @@ loop(State = #{
       loop(State#{sensors => NewSensors});
 
     {failed, SensorId} ->
-      io:format("Servidor recebeu falha do sensor ~p~n", [SensorId]),
+      io:format("Server received failure from sensor ~p~n", [SensorId]),
       NewSensors = maps:remove(SensorId, Sensors),
       monitor:notify_failure(MonitorPid, SensorId),
       loop(State#{sensors => NewSensors});
@@ -44,12 +44,10 @@ loop(State = #{
       Key = {SensorId, UniqueId},
       case sets:is_element(Key, ReceivedIds) of
         true ->
-          %% Já recebeu este dado, ignorar
-          io:format("Servidor ignorou dado duplicado do sensor ~p com ID=~p~n", [SensorId, UniqueId]),
+          io:format("Server ignored duplicate data from sensor ~p with ID=~p~n", [SensorId, UniqueId]),
           loop(State);
         false ->
-          %% Novo dado, armazenar e registrar ID para evitar duplicação futura
-          io:format("Servidor recebeu dados do sensor ~p com ID=~p: ~p~n", [SensorId, UniqueId, DataValue]),
+          io:format("Server received data from sensor ~p with ID=~p: ~p~n", [SensorId, UniqueId, DataValue]),
           NewReceivedIds = sets:add_element(Key, ReceivedIds),
           NewData = [{SensorId, UniqueId, DataValue, erlang:timestamp()} | Data],
           loop(State#{data => NewData, received_ids => NewReceivedIds})
@@ -60,7 +58,7 @@ loop(State = #{
       loop(State);
 
     {stop, From} ->
-      io:format("Servidor parado~n"),
+      io:format("Server stopped~n"),
       From ! stopped,
       ok;
 
@@ -71,6 +69,6 @@ loop(State = #{
 stop(ServerPid) ->
   ServerPid ! {stop, self()},
   receive
-    stopped -> io:format("Servidor finalizado com sucesso~n")
-  after 5000 -> io:format("Timeout aguardando parada do servidor~n")
+    stopped -> io:format("Server successfully terminated~n")
+  after 5000 -> io:format("Timeout waiting for server shutdown~n")
   end.

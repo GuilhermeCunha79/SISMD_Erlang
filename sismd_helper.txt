@@ -1,0 +1,33 @@
+CLIENT
+
+//Iniciar cliente
+erl -sname client22 -setcookie mycookiee
+c(client).
+c(monitor).
+MonitorPid = rpc:call('server11@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+
+//Iniciar clientes
+client:start(1, 5000, [0]). - ligaçao direta ao servidor (0)
+client:start(2, 5000, [1]).
+client:start(3, 5000, [2]).
+client:start(4, 5000, [2,3]).
+
+//Falhar sensor
+client:simulate_failure(2).  
+
+//Reanima sensor
+client:simulate_recovery(2).    
+
+SERVER
+
+//Iniciar servidor
+erl -sname server11 -setcookie mycookiee
+c(server).
+c(monitor).
+ServerPid = server:start().
+
+//Simular falha
+server:stop(ServerPid)
+
+//Reanima
+ServerPid = server:start().                                                                                                                                                                     

@@ -6,39 +6,38 @@
 %%% @end
 %%% Created : 31. May 2025 4:21 PM
 %%%-------------------------------------------------------------------
-%%% client.erl
 -module(client).
--export([start/4, loop/1, simulate_failure/1, get_status/0]).
+-export([start/3, loop/1, simulate_failure/1, simulate_recovery/1, get_status/0]).
 
-start(SensorId, Interval, Neighbors, MonitorPid) ->
+start(SensorId, Interval, Neighbors) ->
   Pid = spawn(?MODULE, loop, [#{
     id => SensorId,
     interval => Interval,
     active => true,
     neighbors => Neighbors,
     original_neighbors => Neighbors,
-    monitor => MonitorPid,
+    monitor => global:whereis_name(monitor),
     registered => false,
     pending_data => [],
-    direct_link => lists:member(1, Neighbors),
+    direct_link => lists:member(0, Neighbors),
     data_counter => 0
   }]),
   SensorName = list_to_atom("sensor_" ++ integer_to_list(SensorId)),
   register(SensorName, Pid),
   global:register_name(SensorName, Pid),
 
-  case lists:member(1, Neighbors) of
+  case lists:member(0, Neighbors) of
     true ->
       case global:whereis_name(central_server) of
-        undefined -> io:format("Sensor ~p: servidor não encontrado~n", [SensorId]);
+        undefined -> io:format("Sensor ~p: server not found~n", [SensorId]);
         ServerPid -> ServerPid ! {register, SensorId, Pid, Neighbors}
       end;
     false ->
-      io:format("Sensor ~p: sem ligação direta ao servidor~n", [SensorId]),
+      io:format("Sensor ~p: no direct link to the server~n", [SensorId]),
       Pid ! registered
   end,
 
-  io:format("Sensor ~p iniciado~n", [SensorId]),
+  io:format("Sensor ~p started~n", [SensorId]),
   Pid.
 
 loop(State = #{
@@ -49,7 +48,7 @@ loop(State = #{
 }) ->
   receive
     registered ->
-      io:format("Sensor ~p registrado no servidor~n", [SensorId]),
+      io:format("Sensor ~p registered with the server~n", [SensorId]),
       timer:send_interval(Interval, self(), collect),
       timer:send_interval(5000, self(), check_server),
       timer:send_interval(3000, self(), retry_pending),
@@ -61,7 +60,7 @@ loop(State = #{
           case global:whereis_name(central_server) of
             undefined -> loop(State);
             Pid when is_pid(Pid) ->
-              io:format("Sensor ~p tentando registrar novamente~n", [SensorId]),
+              io:format("Sensor ~p attempting to re-register~n", [SensorId]),
               Pid ! {register, SensorId, self(), OriginalNeighbors},
               loop(State)
           end;
@@ -71,12 +70,12 @@ loop(State = #{
     collect when Active ->
       DataId = Counter + 1,
       Data = generate_data(),
-      io:format("Sensor ~p coletou dados (id ~p): ~p~n", [SensorId, DataId, Data]),
+      io:format("Sensor ~p collected data (id ~p): ~p~n", [SensorId, DataId, Data]),
       case Direct of
         true ->
           case global:whereis_name(central_server) of
             undefined ->
-              io:format("Sensor ~p: servidor inativo, relay via vizinhos~n", [SensorId]),
+              io:format("Sensor ~p: server inactive, relaying via neighbors~n", [SensorId]),
               lists:foreach(fun(N) -> send_if_alive(N, SensorId, DataId, Data, [SensorId]) end, Neighbors),
               loop(State#{pending_data => [{SensorId, DataId, Data} | Pending], data_counter => DataId});
             Pid ->
@@ -84,7 +83,7 @@ loop(State = #{
               loop(State#{data_counter => DataId})
           end;
         false ->
-          io:format("Sensor ~p: sem ligação direta, relay via vizinhos~n", [SensorId]),
+          io:format("Sensor ~p: no direct link, relaying via neighbors~n", [SensorId]),
           lists:foreach(fun(N) -> send_if_alive(N, SensorId, DataId, Data, [SensorId]) end, Neighbors),
           loop(State#{data_counter => DataId})
       end;
@@ -98,13 +97,13 @@ loop(State = #{
       end;
 
     fail ->
-      io:format("Sensor ~p simulando falha~n", [SensorId]),
+      io:format("Sensor ~p simulating failure~n", [SensorId]),
       notify_central_failed(global:whereis_name(central_server), SensorId),
       monitor:notify_failure(MonitorPid, SensorId),
       loop(State#{active => false});
 
     recover ->
-      io:format("Sensor ~p recuperando~n", [SensorId]),
+      io:format("Sensor ~p recovering~n", [SensorId]),
       case Direct of
         true -> notify_central_register(global:whereis_name(central_server), SensorId, self(), OriginalNeighbors);
         false -> ok
@@ -113,47 +112,43 @@ loop(State = #{
       loop(State#{active => true, neighbors => OriginalNeighbors});
 
     stop ->
-      io:format("Sensor ~p parado~n", [SensorId]);
+      io:format("Sensor ~p stopped~n", [SensorId]);
 
     {neighbor_failed, FailedNeighbor} ->
-      io:format("Sensor ~p removendo vizinho falhado ~p~n", [SensorId, FailedNeighbor]),
+      io:format("Sensor ~p removing failed neighbor ~p~n", [SensorId, FailedNeighbor]),
       NewNeighbors = lists:filter(fun(N) -> N =/= FailedNeighbor end, Neighbors),
       loop(State#{neighbors => NewNeighbors});
 
     {relay, FromSensorId, DataId, Data, Seen} when Active ->
-      io:format("Sensor ~p RECEBEU relay do Sensor ~p (id ~p): ~p~n", [SensorId, FromSensorId, DataId, Data]),
+      io:format("Sensor ~p RECEIVED relay from Sensor ~p (id ~p): ~p~n", [SensorId, FromSensorId, DataId, Data]),
       case Direct of
         true ->
           case global:whereis_name(central_server) of
             undefined ->
-              io:format("Sensor ~p: servidor inativo, repassando relay para vizinhos~n", [SensorId]),
+              io:format("Sensor ~p: server inactive, forwarding relay to neighbors~n", [SensorId]),
               NextNeighbors = lists:filter(fun(N) -> not lists:member(N, Seen) end, Neighbors),
-              lists:foreach(fun(N) ->
-                send_if_alive(N, FromSensorId, DataId, Data, [SensorId | Seen])
-                            end, NextNeighbors),
+              lists:foreach(fun(N) -> send_if_alive(N, FromSensorId, DataId, Data, [SensorId | Seen]) end, NextNeighbors),
               loop(State#{pending_data => [{FromSensorId, DataId, Data} | Pending]});
             Pid ->
               send_data(Pid, FromSensorId, DataId, Data),
               loop(State)
           end;
         false ->
-          io:format("Sensor ~p: relay sem ligação direta, repassando~n", [SensorId]),
+          io:format("Sensor ~p: relay with no direct link, forwarding~n", [SensorId]),
           NextNeighbors = lists:filter(fun(N) -> not lists:member(N, Seen) end, Neighbors),
-          lists:foreach(fun(N) ->
-            send_if_alive(N, FromSensorId, DataId, Data, [SensorId | Seen])
-                        end, NextNeighbors),
+          lists:foreach(fun(N) -> send_if_alive(N, FromSensorId, DataId, Data, [SensorId | Seen]) end, NextNeighbors),
           loop(State)
       end;
 
     {relay, _FromSensorId, _DataId, _Data, _Seen} ->
-      io:format("Sensor ~p inativo, ignorando relay~n", [SensorId]),
+      io:format("Sensor ~p inactive, ignoring relay~n", [SensorId]),
       loop(State);
 
     _Other -> loop(State)
   end.
 
 send_data(Pid, SensorId, DataId, Data) ->
-  io:format("Sensor ~p: enviando dados (id ~p) para o servidor~n", [SensorId, DataId]),
+  io:format("Sensor ~p: sending data (id ~p) to the server~n", [SensorId, DataId]),
   Pid ! {data, SensorId, DataId, Data}.
 
 send_if_alive(NeighborId, OriginalSensorId, DataId, Data, Seen) ->
@@ -191,21 +186,28 @@ generate_data() ->
 simulate_failure(SensorId) ->
   SensorName = list_to_atom("sensor_" ++ integer_to_list(SensorId)),
   case global:whereis_name(SensorName) of
-    undefined -> io:format("Sensor ~p não encontrado~n", [SensorId]);
+    undefined -> io:format("Sensor ~p not found~n", [SensorId]);
     Pid -> Pid ! fail
+  end.
+
+simulate_recovery(SensorId) ->
+  SensorName = list_to_atom("sensor_" ++ integer_to_list(SensorId)),
+  case global:whereis_name(SensorName) of
+    undefined -> io:format("Sensor ~p not found~n", [SensorId]);
+    Pid -> Pid ! recover
   end.
 
 get_status() ->
   case global:whereis_name(central_server) of
-    undefined -> io:format("Servidor central não está ativo~n");
+    undefined -> io:format("Central server is not active~n");
     Pid ->
       Pid ! {status, self()},
       receive
         {status_reply, State} ->
           Sensors = maps:get(sensors, State, #{}),
           Data = maps:get(data, State, []),
-          io:format("Sensores ativos: ~p~n", [maps:size(Sensors)]),
-          io:format("Dados recebidos: ~p~n", [length(Data)])
-      after 5000 -> io:format("Timeout aguardando resposta do servidor~n")
+          io:format("Active sensors: ~p~n", [maps:size(Sensors)]),
+          io:format("Data received: ~p~n", [length(Data)])
+      after 5000 -> io:format("Timeout waiting for server response~n")
       end
   end.

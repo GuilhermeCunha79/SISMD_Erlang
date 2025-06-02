@@ -26,14 +26,14 @@ loop(State) ->
 
       Ref = erlang:monitor(process, Pid),
       State2 = maps:put(SensorId, {Pid, Ref, Neighbors}, State1),
-      io:format("Monitor: sensor ~p registado~n", [SensorId]),
+      io:format("Monitor: sensor ~p registered~n", [SensorId]),
       loop(State2);
 
     {'DOWN', Ref, process, _Pid, Reason} ->
       case find_sensor_by_ref(Ref, State) of
         {ok, SensorId} ->
-          io:format("Monitor: sensor ~p falhou (~p)~n", [SensorId, Reason]),
-          {_Pid, _Ref, Neighbors} = maps:get(SensorId, State),
+          io:format("Monitor: sensor ~p failed (~p)~n", [SensorId, Reason]),
+          {_, _Ref, _Neighbors} = maps:get(SensorId, State),
           State1 = maps:remove(SensorId, State),
           notify_all_neighbors_failure(SensorId, State1),
           loop(State1);
@@ -42,17 +42,17 @@ loop(State) ->
       end;
 
     {failure_report, SensorId} ->
-      io:format("Monitor: sensor ~p reportou falha~n", [SensorId]),
+      io:format("Monitor: sensor ~p reported failure~n", [SensorId]),
       loop(State);
 
     {recovery_report, SensorId, NewNeighbors} ->
       case maps:find(SensorId, State) of
         {ok, {Pid, Ref, _OldNeighbors}} ->
           NewState = maps:put(SensorId, {Pid, Ref, NewNeighbors}, State),
-          io:format("Monitor: sensor ~p recuperou com vizinhos ~p~n", [SensorId, NewNeighbors]),
+          io:format("Monitor: sensor ~p recovered with neighbors ~p~n", [SensorId, NewNeighbors]),
           loop(NewState);
         error ->
-          io:format("Monitor: tentativa de recuperação de sensor não registado ~p~n", [SensorId]),
+          io:format("Monitor: recovery attempt from unregistered sensor ~p~n", [SensorId]),
           loop(State)
       end;
 
@@ -61,11 +61,11 @@ loop(State) ->
       loop(State);
 
     stop ->
-      io:format("Monitor parado~n"),
+      io:format("Monitor stopped~n"),
       ok;
 
     _Other ->
-      io:format("Monitor: mensagem desconhecida ~p~n", [_Other]),
+      io:format("Monitor: unknown message ~p~n", [_Other]),
       loop(State)
   end.
 
