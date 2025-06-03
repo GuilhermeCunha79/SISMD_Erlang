@@ -1,33 +1,55 @@
 CLIENT
 
-//Iniciar cliente
-erl -sname client22 -setcookie mycookiee
+//Iniciar cliente 1
+erl -sname client1 -setcookie mycookiee
+
 c(client).
 c(monitor).
-MonitorPid = rpc:call('server11@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
 
-//Iniciar clientes
+MonitorPid = rpc:call('server1@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+
 client:start(1, 5000, [0]). - ligaçao direta ao servidor (0)
-client:start(2, 5000, [1]).
+
+//Iniciar cliente 2
+erl -sname client2 -setcookie mycookiee
+c(client).
+c(monitor).
+MonitorPid = rpc:call('server1@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+
+client:client:start(2, 5000, [1]).
+
+//Iniciar cliente 3
+erl -sname client3 -setcookie mycookiee
+c(client).
+c(monitor).
+MonitorPid = rpc:call('server1@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+
 client:start(3, 5000, [2]).
+
+//Iniciar cliente 4
+erl -sname client4 -setcookie mycookiee
+c(client).
+c(monitor).
+MonitorPid = rpc:call('server1@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+
 client:start(4, 5000, [2,3]).
 
 //Falhar sensor
-client:simulate_failure(2).  
+client:simulate_failure(2).
 
 //Reanima sensor
-client:simulate_recovery(2).    
+client:simulate_recovery(2).
 
 SERVER
 
 //Iniciar servidor
-erl -sname server11 -setcookie mycookiee
+erl -sname server1 -setcookie mycookiee
 c(server).
 c(monitor).
 ServerPid = server:start().
 
 //Simular falha
-server:stop(ServerPid)
+server:stop(ServerPid).
 
 //Reanima
-ServerPid = server:start().                                                                                                                                                                     
+ServerPid = server:start().
