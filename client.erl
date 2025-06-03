@@ -55,8 +55,8 @@ loop(State = #{
       loop(State#{registered => true});
 
     check_server ->
-      if
-        Registered =:= false, Direct ->
+      case {Registered, Direct} of
+        {false, true} ->
           case global:whereis_name(central_server) of
             undefined -> loop(State);
             Pid when is_pid(Pid) ->
@@ -64,7 +64,7 @@ loop(State = #{
               Pid ! {register, SensorId, self(), OriginalNeighbors},
               loop(State)
           end;
-        true -> loop(State)
+        _ -> loop(State)
       end;
 
     collect when Active ->
