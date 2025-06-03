@@ -10,17 +10,9 @@
 -export([start/3, loop/1, simulate_failure/1, simulate_recovery/1, get_status/0]).
 
 start(SensorId, Interval, Neighbors) ->
-  Pid = spawn(?MODULE, loop, [#{
-    id => SensorId,
-    interval => Interval,
-    active => true,
-    neighbors => Neighbors,
-    original_neighbors => Neighbors,
-    monitor => global:whereis_name(monitor),
-    registered => false,
-    pending_data => [],
-    direct_link => lists:member(0, Neighbors),
-    data_counter => 0
+  Pid = spawn(?MODULE, loop, [#{id => SensorId, interval => Interval, active => true, neighbors => Neighbors,
+    original_neighbors => Neighbors, monitor => global:whereis_name(monitor), registered => false,
+    pending_data => [], direct_link => lists:member(0, Neighbors), data_counter => 0
   }]),
   SensorName = list_to_atom("sensor_" ++ integer_to_list(SensorId)),
   register(SensorName, Pid),
@@ -40,11 +32,9 @@ start(SensorId, Interval, Neighbors) ->
   io:format("Sensor ~p started~n", [SensorId]),
   Pid.
 
-loop(State = #{
-  registered := Registered, id := SensorId, interval := Interval, active := Active,
-  neighbors := Neighbors, original_neighbors := OriginalNeighbors,
-  monitor := MonitorPid, pending_data := Pending, direct_link := Direct,
-  data_counter := Counter
+loop(State = #{registered := Registered, id := SensorId, interval := Interval, active := Active, neighbors := Neighbors,
+                original_neighbors := OriginalNeighbors, monitor := MonitorPid, pending_data := Pending,
+                direct_link := Direct, data_counter := Counter
 }) ->
   receive
     registered ->
