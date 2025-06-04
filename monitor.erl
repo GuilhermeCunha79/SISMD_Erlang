@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @author Guilherme Cunha
-%%% @copyright (C) 2025, <COMPANY>
+%%% @copyright (C) 2025, ISEP
 %%% @doc
 %%%
 %%% @end
@@ -10,12 +10,13 @@
 -export([start/0, loop/1, register_sensor/4, notify_failure/2, notify_recovery/3]).
 
 start() ->
-  spawn(?MODULE, loop, [#{}]).
+  Pid = spawn(?MODULE, loop, [#{}]),
+  register(monitor, Pid),
+  Pid.
 
 loop(State) ->
   receive
     {register, SensorId, Pid, Neighbors} ->
-
       State1 = case maps:find(SensorId, State) of
                  {ok, {_OldPid, OldRef, _OldNeighbors}} ->
                    erlang:demonitor(OldRef, [flush]),

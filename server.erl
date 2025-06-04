@@ -1,35 +1,28 @@
 %%%-------------------------------------------------------------------
 %%% @author Guilherme Cunha
-%%% @copyright (C) 2025, <COMPANY>
+%%% @copyright (C) 2025, ISEP
 %%% @doc
 %%%
 %%% @end
 %%% Created : 31. May 2025 4:21 PM
 %%%-------------------------------------------------------------------
 -module(server).
--export([start/0, loop/1, stop/1]).
+-export([start/1, loop/1, stop/1]).
 
-start() ->
-  MonitorPid = monitor:start(),
+start(MonitorHost) ->
   Sensors = #{},
   Data = [],
   ReceivedIds = sets:new(),
-  Pid = spawn(?MODULE, loop, [#{monitor => MonitorPid, sensors => Sensors, data => Data, received_ids => ReceivedIds}]),
+  Pid = spawn(?MODULE, loop, [#{monitor_host => MonitorHost, sensors => Sensors, data => Data, received_ids => ReceivedIds}]),
   register(central_server, Pid),
-  global:register_name(central_server, Pid),
-  register(monitor, MonitorPid),
-  global:register_name(monitor, MonitorPid),
+
+  io:format("Central server started (monitor at ~p)~n", [MonitorHost]),
   Pid.
 
-loop(State = #{
-  monitor := MonitorPid,
-  sensors := Sensors,
-  data := Data,
-  received_ids := ReceivedIds
-}) ->
+loop(State = #{monitor_host := MonitorHost, sensors := Sensors, data := Data, received_ids := ReceivedIds}) ->
   receive
     {register, SensorId, SensorPid, Neighbors} ->
-      monitor:register_sensor(MonitorPid, SensorId, SensorPid, Neighbors),
+      {monitor, MonitorHost} ! {register, SensorId, SensorPid, Neighbors},
       NewSensors = maps:put(SensorId, SensorPid, Sensors),
       SensorPid ! registered,
       loop(State#{sensors => NewSensors});
@@ -37,7 +30,7 @@ loop(State = #{
     {failed, SensorId} ->
       io:format("Server received failure from sensor ~p~n", [SensorId]),
       NewSensors = maps:remove(SensorId, Sensors),
-      monitor:notify_failure(MonitorPid, SensorId),
+      {monitor, MonitorHost} ! {failure_report, SensorId},
       loop(State#{sensors => NewSensors});
 
     {data, SensorId, UniqueId, DataValue} ->
