@@ -245,8 +245,7 @@ send_data(OriginalSensorId, DataId, Data, Neighbors, Direct, ServerHost, Seen) -
           {false, Neighbors};
         _ ->
           lists:foreach(fun(N) ->
-            io:format("Sensor ~p RELAYING data ~p from Sensor ~p to neighbor Sensor ~p~n",
-              [OriginalSensorId, DataId, OriginalSensorId, N]),
+            io:format("Sensor ~p RELAYING data ~p from Sensor ~p to neighbor Sensor ~p~n", [OriginalSensorId, DataId, OriginalSensorId, N]),
             notify_sensor(N, {relay, OriginalSensorId, DataId, Data, [OriginalSensorId | Seen]})
                         end, ActiveNeighbors),
           Failed = [N || N <- Neighbors, N =/= 0, not is_neighbor_active(N)],
@@ -270,9 +269,10 @@ retry_pending_data(Pending, ServerHost, Neighbors, Direct, SensorId, MonitorHost
               {Success, UpdatedNeighbors} = send_data(OrigSensorId, DataId, Data, AccNeighbors, Direct, ServerHost, []),
               case Success of
                 true -> {AccPending, UpdatedNeighbors};
-                false when Attempts < 5 -> {[{OrigSensorId, DataId, Data, Attempts + 1} | AccPending], UpdatedNeighbors};
+                false when Attempts < 50 ->
+                  {[{OrigSensorId, DataId, Data, Attempts + 1} | AccPending], UpdatedNeighbors};
                 false ->
-                  io:format("Sensor ~p: data ~p from sensor ~p lost after 5 attempts~n", [SensorId, DataId, OrigSensorId]),
+                  io:format("Sensor ~p: data ~p from sensor ~p lost after 50 attempts~n", [SensorId, DataId, OrigSensorId]),
                   notify_service(MonitorHost, monitor, {data_lost, OrigSensorId, DataId}),
                   {AccPending, UpdatedNeighbors}
               end
