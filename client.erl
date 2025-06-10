@@ -136,8 +136,8 @@ loop(State = #{registered := Registered, id := SensorId, interval := Interval, a
       loop(State#{neighbors => NewNeighbors});
 
     {relay, OriginalSensorId, DataId, Data, Seen} when Active ->
-      io:format("Sensor ~p RECEIVED relay from Sensor ~p (id ~p): ~p [seen: ~p]~n",
-        [SensorId, OriginalSensorId, DataId, Data, Seen]),
+      io:format("Sensor ~p RECEIVED relay from Sensor ~p (id ~p): ~p~n",
+        [SensorId, OriginalSensorId, DataId, Data]),
 
       case Direct orelse has_different_neighbors(SensorId, Neighbors, Seen) of
         true ->
@@ -209,8 +209,7 @@ notify_sensor(SensorId, Msg) ->
   end.
 
 notify_neighbors(SensorId, Neighbors, MsgType) ->
-  lists:foreach(fun
-                  (0) -> ok;
+  lists:foreach(fun(0) -> ok;
                   (NeighborId) -> notify_sensor(NeighborId, {MsgType, SensorId})
                 end, Neighbors).
 
@@ -234,10 +233,7 @@ send_data(OriginalSensorId, DataId, Data, Neighbors, Direct, ServerHost, Seen) -
       io:format("Sensor ~p sent data ~p directly to server~n", [OriginalSensorId, DataId]),
       {true, Neighbors};
     false ->
-      ActiveNeighbors = [N || N <- Neighbors,
-        N =/= 0,
-        not lists:member(N, Seen),
-        is_neighbor_active(N)],
+      ActiveNeighbors = [N || N <- Neighbors, N =/= 0, not lists:member(N, Seen), is_neighbor_active(N)],
 
       case ActiveNeighbors of
         [] ->
