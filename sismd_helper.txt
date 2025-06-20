@@ -6,7 +6,7 @@ erl -sname client1 -setcookie mycookiee
 c(client).
 c(monitor).
 
-MonitorPid = rpc:call('server1@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+MonitorPid = rpc:call('server1@DESKTOP-localhost', erlang, whereis, [monitor]).
 
 client:start(1, 5000, [0]). - ligaçao direta ao servidor (0)
 
@@ -14,7 +14,7 @@ client:start(1, 5000, [0]). - ligaçao direta ao servidor (0)
 erl -sname client2 -setcookie mycookiee
 c(client).
 c(monitor).
-MonitorPid = rpc:call('server1@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+MonitorPid = rpc:call('server1@DESKTOP-localhost', erlang, whereis, [monitor]).
 
 client:client:start(2, 5000, [1]).
 
@@ -22,7 +22,7 @@ client:client:start(2, 5000, [1]).
 erl -sname client3 -setcookie mycookiee
 c(client).
 c(monitor).
-MonitorPid = rpc:call('server1@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+MonitorPid = rpc:call('server1@DESKTOP-localhost', erlang, whereis, [monitor]).
 
 client:start(3, 5000, [2]).
 
@@ -30,7 +30,7 @@ client:start(3, 5000, [2]).
 erl -sname client4 -setcookie mycookiee
 c(client).
 c(monitor).
-MonitorPid = rpc:call('server1@DESKTOP-LPMIHQM', erlang, whereis, [monitor]).
+MonitorPid = rpc:call('server1@DESKTOP-localhost', erlang, whereis, [monitor]).
 
 client:start(4, 5000, [2,3]).
 
